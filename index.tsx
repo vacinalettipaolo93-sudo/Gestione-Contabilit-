@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import {
+    collection,
+    doc,
+    onSnapshot,
+    setDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp,
+    query,
+    orderBy,
+    limit,
+    getDocs,
+} from 'firebase/firestore';
 import { Lesson, Settings, SportSetting } from './types';
 import Header from './components/Header';
 import Summary from './components/Summary';
@@ -52,7 +65,6 @@ const App: React.FC = () => {
                     const loadedData = docSnap.data();
                     const sportsSource = Array.isArray(loadedData?.sports) ? loadedData.sports : DEFAULT_SETTINGS.sports;
 
-                    // Deeply merge and sanitize settings to prevent crashes from malformed data.
                     const newSettings: Settings = {
                         ...DEFAULT_SETTINGS,
                         ...loadedData,
@@ -71,9 +83,7 @@ const App: React.FC = () => {
 
                     setSettings(newSettings);
                 } else {
-                    // IMPORTANT:
-                    // Non ricreare automaticamente il documento su Firestore.
-                    // Se è stato cancellato/inesistente, evitiamo di sovrascrivere coi DEFAULT.
+                    // IMPORTANT: non riscrivere DEFAULT su Firestore automaticamente
                     console.warn(
                         '[Firestore] Documento settings/main non trovato. Mostro DEFAULT_SETTINGS in UI, ma NON scrivo su Firestore.'
                     );
@@ -81,9 +91,7 @@ const App: React.FC = () => {
                 }
             },
             (error) => {
-                // Se ci sono problemi di permessi/rete ecc., non scriviamo nulla su Firestore.
                 console.error('[Firestore] Errore listener settings/main:', error);
-                // Fallback UI
                 setSettings(DEFAULT_SETTINGS);
             }
         );
@@ -224,10 +232,76 @@ const App: React.FC = () => {
         }
     };
 
-    const handleSaveSettings = (newSettings: Settings) => {
+    // ✅ Salva con BACKUP automatico
+    const handleSaveSettings = async (newSettings: Settings) => {
         if (!user) return;
+
         const settingsDocRef = doc(db, 'users', user.uid, 'settings', 'main');
-        setDoc(settingsDocRef, newSettings);
+        const backupsColRef = collection(db, 'users', user.uid, 'settings_backups');
+
+        try {
+            // 1) Backup PRIMA del salvataggio
+            await addDoc(backupsColRef, {
+                createdAt: serverTimestamp(),
+                reason: 'manual_save',
+                version: 1,
+                settings: newSettings,
+            });
+
+            // 2) Salvataggio ufficiale
+            await setDoc(settingsDocRef, newSettings);
+
+            console.log('[Firestore] Settings salvate + backup creato.');
+        } catch (e) {
+            console.error('[Firestore] Errore salvataggio settings/backup:', e);
+            alert('Errore durante il salvataggio su Firebase. Controlla la console.');
+        }
+    };
+
+    // ✅ Ripristina l'ULTIMO backup (1 click)
+    const handleRestoreLatestSettingsBackup = async () => {
+        if (!user) return;
+
+        const backupsColRef = collection(db, 'users', user.uid, 'settings_backups');
+        const settingsDocRef = doc(db, 'users', user.uid, 'settings', 'main');
+
+        const confirm = window.confirm(
+            "Vuoi ripristinare l'ULTIMO backup delle impostazioni? Questa operazione sovrascrive le impostazioni attuali."
+        );
+        if (!confirm) return;
+
+        try {
+            const q = query(backupsColRef, orderBy('createdAt', 'desc'), limit(1));
+            const snap = await getDocs(q);
+
+            if (snap.empty) {
+                alert('Nessun backup trovato.');
+                return;
+            }
+
+            const latest = snap.docs[0].data() as any;
+            const backupSettings = latest?.settings;
+
+            if (!backupSettings) {
+                alert('Backup trovato ma senza campo "settings".');
+                return;
+            }
+
+            // (Opzionale) prima di ripristinare, faccio un backup dello stato corrente
+            await addDoc(backupsColRef, {
+                createdAt: serverTimestamp(),
+                reason: 'before_restore_latest',
+                version: 1,
+                settings,
+            });
+
+            await setDoc(settingsDocRef, backupSettings);
+
+            alert('Ripristino completato: ho caricato l’ultimo backup su settings/main.');
+        } catch (e) {
+            console.error('[Firestore] Errore ripristino backup:', e);
+            alert('Errore durante il ripristino. Controlla la console.');
+        }
     };
 
     const handleStartEdit = (lesson: Lesson) => {
@@ -305,6 +379,7 @@ const App: React.FC = () => {
                 settings={settings}
                 lessons={lessons}
                 onSave={handleSaveSettings}
+                onRestoreLatestBackup={handleRestoreLatestSettingsBackup}
             />
             <ExportForm
                 isOpen={isExportFormOpen}
