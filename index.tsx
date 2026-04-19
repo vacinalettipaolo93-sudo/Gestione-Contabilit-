@@ -40,115 +40,162 @@ const App: React.FC = () => {
             setLessons([]);
             setSettings(DEFAULT_SETTINGS);
             return;
-        };
+        }
 
         const settingsRef = doc(db, 'users', user.uid, 'settings', 'main');
         const lessonsCollectionRef = collection(db, 'users', user.uid, 'lessons');
 
-        const unsubscribeSettings = onSnapshot(settingsRef, docSnap => {
-            if (docSnap.exists()) {
-                const loadedData = docSnap.data();
-                const sportsSource = Array.isArray(loadedData?.sports) ? loadedData.sports : DEFAULT_SETTINGS.sports;
-                
-                // Deeply merge and sanitize settings to prevent crashes from malformed data.
-                const newSettings: Settings = {
-                    ...DEFAULT_SETTINGS,
-                    ...loadedData,
-                    taxRate: typeof loadedData?.taxRate === 'number' ? loadedData.taxRate : 0,
-                    sports: sportsSource
-                        .filter((sport: unknown): sport is Partial<SportSetting> => sport && typeof sport === 'object') // Filter out null/invalid entries
-                        .map((sport: Partial<SportSetting>): SportSetting => ({
-                            id: sport.id || `sport-${Date.now()}`,
-                            name: sport.name || 'Senza nome',
-                            lessonTypes: Array.isArray(sport.lessonTypes) ? sport.lessonTypes : [],
-                            locations: Array.isArray(sport.locations) ? sport.locations : [],
-                            prices: typeof sport.prices === 'object' && sport.prices !== null ? sport.prices : {},
-                            costs: typeof sport.costs === 'object' && sport.costs !== null ? sport.costs : {},
-                        })),
-                };
-                setSettings(newSettings);
-            } else {
-                setDoc(settingsRef, DEFAULT_SETTINGS);
+        const unsubscribeSettings = onSnapshot(
+            settingsRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    const loadedData = docSnap.data();
+                    const sportsSource = Array.isArray(loadedData?.sports) ? loadedData.sports : DEFAULT_SETTINGS.sports;
+
+                    // Deeply merge and sanitize settings to prevent crashes from malformed data.
+                    const newSettings: Settings = {
+                        ...DEFAULT_SETTINGS,
+                        ...loadedData,
+                        taxRate: typeof loadedData?.taxRate === 'number' ? loadedData.taxRate : 0,
+                        sports: sportsSource
+                            .filter((sport: unknown): sport is Partial<SportSetting> => sport && typeof sport === 'object')
+                            .map((sport: Partial<SportSetting>): SportSetting => ({
+                                id: sport.id || `sport-${Date.now()}`,
+                                name: sport.name || 'Senza nome',
+                                lessonTypes: Array.isArray(sport.lessonTypes) ? sport.lessonTypes : [],
+                                locations: Array.isArray(sport.locations) ? sport.locations : [],
+                                prices: typeof sport.prices === 'object' && sport.prices !== null ? sport.prices : {},
+                                costs: typeof sport.costs === 'object' && sport.costs !== null ? sport.costs : {},
+                            })),
+                    };
+
+                    setSettings(newSettings);
+                } else {
+                    // IMPORTANT:
+                    // Non ricreare automaticamente il documento su Firestore.
+                    // Se è stato cancellato/inesistente, evitiamo di sovrascrivere coi DEFAULT.
+                    console.warn(
+                        '[Firestore] Documento settings/main non trovato. Mostro DEFAULT_SETTINGS in UI, ma NON scrivo su Firestore.'
+                    );
+                    setSettings(DEFAULT_SETTINGS);
+                }
+            },
+            (error) => {
+                // Se ci sono problemi di permessi/rete ecc., non scriviamo nulla su Firestore.
+                console.error('[Firestore] Errore listener settings/main:', error);
+                // Fallback UI
                 setSettings(DEFAULT_SETTINGS);
             }
-        });
+        );
 
-        const unsubscribeLessons = onSnapshot(lessonsCollectionRef, snapshot => {
-            const userLessons = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    date: data.date || '',
-                    sportId: data.sportId || '',
-                    lessonTypeId: data.lessonTypeId || '',
-                    locationId: data.locationId || '',
-                    price: data.price || 0,
-                    cost: data.cost || 0,
-                    invoiced: data.invoiced || false,
-                } as Lesson;
-            });
-            setLessons(userLessons);
-        });
+        const unsubscribeLessons = onSnapshot(
+            lessonsCollectionRef,
+            (snapshot) => {
+                const userLessons = snapshot.docs.map((docItem) => {
+                    const data = docItem.data();
+                    return {
+                        id: docItem.id,
+                        date: data.date || '',
+                        sportId: data.sportId || '',
+                        lessonTypeId: data.lessonTypeId || '',
+                        locationId: data.locationId || '',
+                        price: data.price || 0,
+                        cost: data.cost || 0,
+                        invoiced: data.invoiced || false,
+                    } as Lesson;
+                });
+                setLessons(userLessons);
+            },
+            (error) => {
+                console.error('[Firestore] Errore listener lessons:', error);
+                setLessons([]);
+            }
+        );
 
         return () => {
             unsubscribeSettings();
             unsubscribeLessons();
         };
-
     }, [user]);
 
     const monthlyLessons = useMemo(() => {
-        return lessons.filter(lesson => {
+        return lessons.filter((lesson) => {
             const lessonDate = new Date(lesson.date + 'T00:00:00');
-            return lessonDate.getFullYear() === currentDate.getFullYear() &&
-                   lessonDate.getMonth() === currentDate.getMonth();
+            return (
+                lessonDate.getFullYear() === currentDate.getFullYear() &&
+                lessonDate.getMonth() === currentDate.getMonth()
+            );
         });
     }, [lessons, currentDate]);
 
     const summaryData = useMemo(() => {
-        if (!settings) return { totalLessons: 0, totalIncome: 0, lessonsBySport: {}, totalInvoicedGross: 0, totalInvoicedNet: 0, totalNotInvoicedIncome: 0, lessonsByLessonType: {}, lessonsByLocation: {}, taxRate: 0 };
+        if (!settings)
+            return {
+                totalLessons: 0,
+                totalIncome: 0,
+                lessonsBySport: {},
+                totalInvoicedGross: 0,
+                totalInvoicedNet: 0,
+                totalNotInvoicedIncome: 0,
+                lessonsByLessonType: {},
+                lessonsByLocation: {},
+                taxRate: 0,
+            };
+
         const totalLessons = monthlyLessons.length;
         const totalIncome = monthlyLessons.reduce((sum, lesson) => sum + (lesson.price - lesson.cost), 0);
-        
+
         const lessonsBySport = monthlyLessons.reduce((acc, lesson) => {
-            const sport = settings.sports.find(s => s.id === lesson.sportId);
+            const sport = settings.sports.find((s) => s.id === lesson.sportId);
             if (sport) {
-                 acc[sport.name] = (acc[sport.name] || 0) + 1;
+                acc[sport.name] = (acc[sport.name] || 0) + 1;
             }
             return acc;
         }, {} as Record<string, number>);
-        
+
         const lessonsByLessonType = monthlyLessons.reduce((acc, lesson) => {
-            const sport = settings.sports.find(s => s.id === lesson.sportId);
+            const sport = settings.sports.find((s) => s.id === lesson.sportId);
             if (!sport) return acc;
-            const lessonType = sport.lessonTypes.find(lt => lt.id === lesson.lessonTypeId);
+            const lessonType = sport.lessonTypes.find((lt) => lt.id === lesson.lessonTypeId);
             if (lessonType) {
-                 const key = `${sport.name} - ${lessonType.name}`;
-                 acc[key] = (acc[key] || 0) + 1;
+                const key = `${sport.name} - ${lessonType.name}`;
+                acc[key] = (acc[key] || 0) + 1;
             }
             return acc;
         }, {} as Record<string, number>);
-        
+
         const lessonsByLocation = monthlyLessons.reduce((acc, lesson) => {
-            const sport = settings.sports.find(s => s.id === lesson.sportId);
+            const sport = settings.sports.find((s) => s.id === lesson.sportId);
             if (!sport) return acc;
-            const location = sport.locations.find(l => l.id === lesson.locationId);
+            const location = sport.locations.find((l) => l.id === lesson.locationId);
             if (location) {
-                 acc[location.name] = (acc[location.name] || 0) + 1;
+                acc[location.name] = (acc[location.name] || 0) + 1;
             }
             return acc;
         }, {} as Record<string, number>);
-        
-        const totalInvoicedGross = monthlyLessons.filter(l => l.invoiced).reduce((sum, lesson) => sum + (lesson.price - lesson.cost), 0);
-        
+
+        const totalInvoicedGross = monthlyLessons
+            .filter((l) => l.invoiced)
+            .reduce((sum, lesson) => sum + (lesson.price - lesson.cost), 0);
+
         const taxRate = settings.taxRate || 0;
-        const totalInvoicedNet = totalInvoicedGross * (1 - (taxRate / 100));
+        const totalInvoicedNet = totalInvoicedGross * (1 - taxRate / 100);
 
         const totalNotInvoicedIncome = totalIncome - totalInvoicedGross;
 
-        return { totalLessons, totalIncome, lessonsBySport, totalInvoicedGross, totalInvoicedNet, totalNotInvoicedIncome, lessonsByLessonType, lessonsByLocation, taxRate };
+        return {
+            totalLessons,
+            totalIncome,
+            lessonsBySport,
+            totalInvoicedGross,
+            totalInvoicedNet,
+            totalNotInvoicedIncome,
+            lessonsByLessonType,
+            lessonsByLocation,
+            taxRate,
+        };
     }, [monthlyLessons, settings]);
-    
+
     const handleAddLesson = (newLessonData: Omit<Lesson, 'id'>) => {
         if (!user) return;
         const lessonsCollectionRef = collection(db, 'users', user.uid, 'lessons');
@@ -167,11 +214,11 @@ const App: React.FC = () => {
         const lessonDocRef = doc(db, 'users', user.uid, 'lessons', id);
         deleteDoc(lessonDocRef);
     };
-    
+
     const handleToggleInvoiced = (id: string) => {
         if (!user) return;
-        const lesson = lessons.find(l => l.id === id);
-        if(lesson) {
+        const lesson = lessons.find((l) => l.id === id);
+        if (lesson) {
             const lessonDocRef = doc(db, 'users', user.uid, 'lessons', id);
             updateDoc(lessonDocRef, { invoiced: !lesson.invoiced });
         }
@@ -194,7 +241,11 @@ const App: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-indigo-500 font-bold animate-pulse">Caricamento...</div>;
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-indigo-500 font-bold animate-pulse">
+                Caricamento...
+            </div>
+        );
     }
 
     if (!user) {
@@ -205,8 +256,8 @@ const App: React.FC = () => {
         <div className="min-h-screen">
             <Header
                 currentDate={currentDate}
-                onPrevMonth={() => setCurrentDate(d => new Date(d.setMonth(d.getMonth() - 1)))}
-                onNextMonth={() => setCurrentDate(d => new Date(d.setMonth(d.getMonth() + 1)))}
+                onPrevMonth={() => setCurrentDate((d) => new Date(d.setMonth(d.getMonth() - 1)))}
+                onNextMonth={() => setCurrentDate((d) => new Date(d.setMonth(d.getMonth() + 1)))}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onOpenExport={() => setIsExportFormOpen(true)}
                 user={user}
@@ -232,9 +283,9 @@ const App: React.FC = () => {
                 />
             </main>
             <div className="fixed bottom-6 right-6 z-20">
-                 <button
+                <button
                     onClick={handleOpenFormForAdd}
-                    className="bg-gradient-to-br from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white rounded-full p-4 shadow-xl shadow-indigo-500/30 focus:outline-none transition-all transform hover:scale-110 active:scale-95"
+                    className="bg-gradient-to-br from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white rounded-full p-4 shadow-xl shadow-indigo-500/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all"
                     aria-label="Aggiungi nuova lezione"
                 >
                     <PlusIcon className="w-8 h-8" />
