@@ -6,14 +6,14 @@ const isSportInUse = (sportId: string, lessons: Lesson[]) => lessons.some(l => l
 const isLessonTypeInUse = (sportId: string, lessonTypeId: string, lessons: Lesson[]) => lessons.some(l => l.sportId === sportId && l.lessonTypeId === lessonTypeId);
 const isLocationInUse = (sportId: string, locationId: string, lessons: Lesson[]) => lessons.some(l => l.sportId === sportId && l.locationId === locationId);
 
-
 const SettingsForm: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     settings: Settings;
     lessons: Lesson[];
     onSave: (settings: Settings) => void;
-}> = ({ isOpen, onClose, settings, lessons, onSave }) => {
+    onRestoreLatestBackup: () => void;
+}> = ({ isOpen, onClose, settings, lessons, onSave, onRestoreLatestBackup }) => {
 
     const [localSettings, setLocalSettings] = useState<Settings>(JSON.parse(JSON.stringify(settings)));
 
@@ -22,7 +22,7 @@ const SettingsForm: React.FC<{
             setLocalSettings(JSON.parse(JSON.stringify(settings)));
         }
     }, [settings, isOpen]);
-    
+
     const updateSettings = (updater: (draft: Settings) => void) => {
         setLocalSettings(currentSettings => {
             const newSettings = JSON.parse(JSON.stringify(currentSettings));
@@ -55,7 +55,7 @@ const SettingsForm: React.FC<{
             draft.sports[sportIndex].name = name;
         });
     };
-    
+
     const addLessonType = (sportIndex: number) => {
         updateSettings(draft => {
             draft.sports[sportIndex].lessonTypes.push({
@@ -77,42 +77,42 @@ const SettingsForm: React.FC<{
             draft.sports[sportIndex].lessonTypes.splice(ltIndex, 1);
         });
     };
-    
+
     const updateLessonTypeName = (sportIndex: number, ltIndex: number, name: string) => {
         updateSettings(draft => {
             draft.sports[sportIndex].lessonTypes[ltIndex].name = name;
         });
     };
-    
+
     const addLocation = (sportIndex: number) => {
-         updateSettings(draft => {
+        updateSettings(draft => {
             draft.sports[sportIndex].locations.push({
                 id: `loc-${Date.now()}`,
                 name: 'Nuova Sede'
             });
         });
     };
-    
+
     const removeLocation = (sportIndex: number, locIndex: number) => {
-         updateSettings(draft => {
+        updateSettings(draft => {
             const locationId = draft.sports[sportIndex].locations[locIndex].id;
             delete draft.sports[sportIndex].costs[locationId];
             draft.sports[sportIndex].locations.splice(locIndex, 1);
         });
     };
-    
+
     const updateLocationName = (sportIndex: number, locIndex: number, name: string) => {
         updateSettings(draft => {
             draft.sports[sportIndex].locations[locIndex].name = name;
         });
     };
-    
+
     const updatePrice = (sportIndex: number, lessonTypeId: string, price: number) => {
         updateSettings(draft => {
             draft.sports[sportIndex].prices[lessonTypeId] = price;
         });
     };
-    
+
     const updateCost = (sportIndex: number, locationId: string, lessonTypeId: string, cost: number) => {
         updateSettings(draft => {
             if (!draft.sports[sportIndex].costs[locationId]) {
@@ -121,7 +121,7 @@ const SettingsForm: React.FC<{
             draft.sports[sportIndex].costs[locationId][lessonTypeId] = cost;
         });
     };
-    
+
     const handleSave = () => {
         onSave(localSettings);
         onClose();
@@ -140,13 +140,13 @@ const SettingsForm: React.FC<{
                 <div className="space-y-8">
                     {/* General Settings Section */}
                     <div className="bg-black/20 p-5 rounded-2xl border border-white/5 shadow-sm">
-                         <div className="flex items-center gap-2 mb-4">
-                             <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                                 <ReceiptPercentIcon className="w-5 h-5" />
-                             </div>
-                             <h3 className="font-bold text-lg text-zinc-100">Configurazione Fiscale</h3>
-                         </div>
-                         <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
+                                <ReceiptPercentIcon className="w-5 h-5" />
+                            </div>
+                            <h3 className="font-bold text-lg text-zinc-100">Configurazione Fiscale</h3>
+                        </div>
+                        <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
                             <label htmlFor="taxRate" className="text-sm font-semibold text-zinc-300">
                                 Percentuale Tasse / Ritenuta
                             </label>
@@ -204,12 +204,12 @@ const SettingsForm: React.FC<{
                                                             className="flex-grow px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-200 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         />
                                                         <div className="relative">
-                                                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 text-sm">€</span>
+                                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 text-sm">€</span>
                                                             <input
                                                                 type="number"
                                                                 value={sport.prices[lt.id] || ''}
                                                                 onChange={(e) => updatePrice(sportIndex, lt.id, parseFloat(e.target.value) || 0)}
-                                                                className="w-24 pl-7 pr-2 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-200 focus:ring-2 focus:ring-emerald-500/50 outline-none font-mono"
+                                                                className="w-24 pl-7 pr-2 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-200 focus:ring-2 focus:ring-emerald-500/50 outline-none"
                                                             />
                                                         </div>
                                                         <button
@@ -222,7 +222,10 @@ const SettingsForm: React.FC<{
                                                     </div>
                                                 )
                                             })}
-                                            <button onClick={() => addLessonType(sportIndex)} className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-zinc-700 rounded-lg text-sm text-zinc-500 hover:text-indigo-500 hover:border-indigo-500 hover:bg-indigo-500/10 transition-all">
+                                            <button
+                                                onClick={() => addLessonType(sportIndex)}
+                                                className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-zinc-700 rounded-lg text-sm text-zinc-500 hover:text-indigo-500 hover:border-indigo-500 hover:bg-indigo-500/10 transition-all"
+                                            >
                                                 <PlusIcon className="w-4 h-4" /> Aggiungi Tipo
                                             </button>
                                         </div>
@@ -254,48 +257,51 @@ const SettingsForm: React.FC<{
                                                     </div>
                                                 )
                                             })}
-                                             <button onClick={() => addLocation(sportIndex)} className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-zinc-700 rounded-lg text-sm text-zinc-500 hover:text-indigo-500 hover:border-indigo-500 hover:bg-indigo-500/10 transition-all">
+                                            <button
+                                                onClick={() => addLocation(sportIndex)}
+                                                className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-zinc-700 rounded-lg text-sm text-zinc-500 hover:text-indigo-500 hover:border-indigo-500 hover:bg-indigo-500/10 transition-all"
+                                            >
                                                 <PlusIcon className="w-4 h-4" /> Aggiungi Sede
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {/* Costs Table */}
                                 {sport.locations.length > 0 && sport.lessonTypes.length > 0 && (
-                                     <div className="mt-8">
-                                         <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Costi Sede (per tipo lezione)</h4>
-                                         <div className="overflow-hidden rounded-xl border border-white/10">
-                                             <table className="w-full text-sm text-left bg-white/5">
-                                                 <thead>
-                                                     <tr className="border-b border-white/10 bg-white/5">
-                                                         <th className="p-3 font-semibold text-zinc-300">Sede</th>
-                                                         {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center">{lt.name}</th>)}
-                                                     </tr>
-                                                 </thead>
-                                                 <tbody>
-                                                     {sport.locations.map(loc => (
-                                                         <tr key={loc.id} className="border-b border-white/5 last:border-0">
-                                                             <td className="p-3 font-medium text-zinc-200">{loc.name}</td>
-                                                             {sport.lessonTypes.map(lt => (
-                                                                 <td key={lt.id} className="p-2">
-                                                                     <div className="relative max-w-[100px] mx-auto">
-                                                                         <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-zinc-400 text-xs">€</span>
-                                                                         <input
-                                                                             type="number"
-                                                                             value={(sport.costs[loc.id] && sport.costs[loc.id][lt.id]) || ''}
-                                                                             onChange={(e) => updateCost(sportIndex, loc.id, lt.id, parseFloat(e.target.value) || 0)}
-                                                                             className="w-full pl-5 pr-2 py-1.5 bg-black/20 border border-white/10 rounded-md text-sm text-center focus:ring-1 focus:ring-red-500/50 outline-none font-mono"
-                                                                         />
-                                                                     </div>
-                                                                 </td>
-                                                             ))}
-                                                         </tr>
-                                                     ))}
-                                                 </tbody>
-                                             </table>
-                                         </div>
-                                     </div>
+                                    <div className="mt-8">
+                                        <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Costi Sede (per tipo lezione)</h4>
+                                        <div className="overflow-hidden rounded-xl border border-white/10">
+                                            <table className="w-full text-sm text-left bg-white/5">
+                                                <thead>
+                                                    <tr className="border-b border-white/10 bg-white/5">
+                                                        <th className="p-3 font-semibold text-zinc-300">Sede</th>
+                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center">{lt.name}</th>)}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {sport.locations.map(loc => (
+                                                        <tr key={loc.id} className="border-b border-white/5 last:border-0">
+                                                            <td className="p-3 font-medium text-zinc-200">{loc.name}</td>
+                                                            {sport.lessonTypes.map(lt => (
+                                                                <td key={lt.id} className="p-2">
+                                                                    <div className="relative max-w-[100px] mx-auto">
+                                                                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-zinc-400 text-xs">€</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(sport.costs[loc.id] && sport.costs[loc.id][lt.id]) || ''}
+                                                                            onChange={(e) => updateCost(sportIndex, loc.id, lt.id, parseFloat(e.target.value) || 0)}
+                                                                            className="w-full pl-5 pr-2 py-1.5 bg-black/20 border border-white/10 rounded-md text-sm text-center focus:ring-1 focus:ring-indigo-500/50 outline-none text-white"
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         )
@@ -309,21 +315,32 @@ const SettingsForm: React.FC<{
                     <PlusIcon className="w-5 h-5" /> Aggiungi Nuovo Sport
                 </button>
 
-                <div className="flex justify-end gap-4 pt-6 mt-6 border-t border-white/5 sticky bottom-0 bg-zinc-900 pb-2 z-10">
+                <div className="flex justify-between items-center gap-4 pt-6 mt-6 border-t border-white/5 sticky bottom-0 bg-zinc-900 pb-2 z-10">
                     <button
                         type="button"
-                        onClick={onClose}
-                        className="px-6 py-2.5 bg-white/10 text-zinc-200 rounded-xl hover:bg-white/20 transition-colors font-semibold"
+                        onClick={onRestoreLatestBackup}
+                        className="px-4 py-2.5 bg-amber-500/10 text-amber-300 rounded-xl hover:bg-amber-500/20 transition-colors font-semibold"
+                        title="Ripristina l'ultimo backup salvato su Firebase"
                     >
-                        Annulla
+                        Ripristina ultimo backup
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-500/20 font-semibold transition-transform transform hover:scale-[1.02]"
-                    >
-                        Salva Tutto
-                    </button>
+
+                    <div className="flex justify-end gap-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-2.5 bg-white/10 text-zinc-200 rounded-xl hover:bg-white/20 transition-colors font-semibold"
+                        >
+                            Annulla
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-500/20 font-semibold"
+                        >
+                            Salva Tutto
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
