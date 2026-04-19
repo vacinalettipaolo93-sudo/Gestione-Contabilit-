@@ -24,11 +24,31 @@ export interface Settings {
 
 export interface Lesson {
   id: string;
-  date: string; // ISO string format
+  date: string; // YYYY-MM-DD
   sportId: string;
   lessonTypeId: string;
   locationId: string;
   price: number;
   cost: number;
   invoiced: boolean;
+}
+
+/** Spese */
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface Expense {
+  id: string;
+  date: string; // YYYY-MM-DD
+  categoryId: string;
+  name: string;
+  amount: number;
+  notes?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
