@@ -15,13 +15,14 @@ import {
     limit,
     getDocs,
 } from 'firebase/firestore';
-import { Lesson, Settings, SportSetting } from './types';
+import { Lesson, Settings, SportSetting, Expense, ExpenseCategory } from './types';
 import Header from './components/Header';
 import Summary from './components/Summary';
 import LessonList from './components/LessonList';
 import LessonForm from './components/LessonForm';
 import SettingsForm from './components/SettingsForm';
 import ExportForm from './components/ExportForm';
+import ExpensesModal from './components/ExpensesModal';
 import Login from './components/Login';
 import { PlusIcon } from './components/icons';
 import { DEFAULT_SETTINGS } from './constants';
@@ -30,12 +31,20 @@ import { auth, db, signOut } from './firebase';
 const App: React.FC = () => {
     const [user, setUser] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
     const [lessons, setLessons] = useState<Lesson[]>([]);
+
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+
     const [currentDate, setCurrentDate] = useState(new Date());
+
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isExportFormOpen, setIsExportFormOpen] = useState(false);
+    const [isExpensesOpen, setIsExpensesOpen] = useState(false);
+
     const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
 
     // Auth and initial data loading
@@ -52,11 +61,16 @@ const App: React.FC = () => {
         if (!user) {
             setLessons([]);
             setSettings(DEFAULT_SETTINGS);
+            setExpenseCategories([]);
+            setExpenses([]);
             return;
         }
 
         const settingsRef = doc(db, 'users', user.uid, 'settings', 'main');
         const lessonsCollectionRef = collection(db, 'users', user.uid, 'lessons');
+
+        const expenseCategoriesRef = collection(db, 'users', user.uid, 'expense_categories');
+        const expensesRef = collection(db, 'users', user.uid, 'expenses');
 
         const unsubscribeSettings = onSnapshot(
             settingsRef,
@@ -120,9 +134,55 @@ const App: React.FC = () => {
             }
         );
 
+        const unsubscribeExpenseCategories = onSnapshot(
+            query(expenseCategoriesRef, orderBy('name', 'asc')),
+            (snapshot) => {
+                const cats = snapshot.docs.map((d) => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        name: data.name || 'Senza nome',
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt,
+                    } as ExpenseCategory;
+                });
+                setExpenseCategories(cats);
+            },
+            (error) => {
+                console.error('[Firestore] Errore listener expense_categories:', error);
+                setExpenseCategories([]);
+            }
+        );
+
+        const unsubscribeExpenses = onSnapshot(
+            query(expensesRef, orderBy('date', 'desc')),
+            (snapshot) => {
+                const exps = snapshot.docs.map((d) => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        date: data.date || '',
+                        categoryId: data.categoryId || '',
+                        name: data.name || '',
+                        amount: typeof data.amount === 'number' ? data.amount : Number(data.amount || 0),
+                        notes: data.notes || '',
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt,
+                    } as Expense;
+                });
+                setExpenses(exps);
+            },
+            (error) => {
+                console.error('[Firestore] Errore listener expenses:', error);
+                setExpenses([]);
+            }
+        );
+
         return () => {
             unsubscribeSettings();
             unsubscribeLessons();
+            unsubscribeExpenseCategories();
+            unsubscribeExpenses();
         };
     }, [user]);
 
@@ -135,6 +195,17 @@ const App: React.FC = () => {
             );
         });
     }, [lessons, currentDate]);
+
+    const monthlyExpenses = useMemo(() => {
+        return expenses.filter((e) => {
+            const dt = new Date(e.date + 'T00:00:00');
+            return dt.getFullYear() === currentDate.getFullYear() && dt.getMonth() === currentDate.getMonth();
+        });
+    }, [expenses, currentDate]);
+
+    const totalExpensesMonth = useMemo(() => {
+        return monthlyExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    }, [monthlyExpenses]);
 
     const summaryData = useMemo(() => {
         if (!settings)
@@ -203,6 +274,11 @@ const App: React.FC = () => {
             taxRate,
         };
     }, [monthlyLessons, settings]);
+
+    const netProfitMonth = useMemo(() => {
+        // “Guadagno” usiamo totalIncome (profit = price - cost, di tutte le lezioni del mese)
+        return summaryData.totalIncome - totalExpensesMonth;
+    }, [summaryData.totalIncome, totalExpensesMonth]);
 
     const handleAddLesson = (newLessonData: Omit<Lesson, 'id'>) => {
         if (!user) return;
@@ -304,6 +380,61 @@ const App: React.FC = () => {
         }
     };
 
+    // Spese: categorie
+    const handleAddExpenseCategory = async (name: string) => {
+        if (!user) return;
+        const colRef = collection(db, 'users', user.uid, 'expense_categories');
+        await addDoc(colRef, {
+            name,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+    };
+
+    const handleRenameExpenseCategory = async (categoryId: string, newName: string) => {
+        if (!user) return;
+        const ref = doc(db, 'users', user.uid, 'expense_categories', categoryId);
+        await updateDoc(ref, { name: newName, updatedAt: serverTimestamp() });
+    };
+
+    const handleDeleteExpenseCategory = async (categoryId: string) => {
+        if (!user) return;
+
+        // blocca se ci sono spese
+        const used = expenses.some((e) => e.categoryId === categoryId);
+        if (used) {
+            alert('Non puoi eliminare una categoria che è usata da una o più spese.');
+            return;
+        }
+
+        const ref = doc(db, 'users', user.uid, 'expense_categories', categoryId);
+        await deleteDoc(ref);
+    };
+
+    // Spese: CRUD
+    const handleAddExpense = async (data: Omit<Expense, 'id'>) => {
+        if (!user) return;
+        const colRef = collection(db, 'users', user.uid, 'expenses');
+        await addDoc(colRef, {
+            ...data,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+    };
+
+    const handleUpdateExpense = async (data: Expense) => {
+        if (!user) return;
+        const { id, ...rest } = data;
+        const ref = doc(db, 'users', user.uid, 'expenses', id);
+        await updateDoc(ref, { ...rest, updatedAt: serverTimestamp() });
+    };
+
+    const handleDeleteExpense = async (id: string) => {
+        if (!user) return;
+        const ref = doc(db, 'users', user.uid, 'expenses', id);
+        await deleteDoc(ref);
+    };
+
     const handleStartEdit = (lesson: Lesson) => {
         setEditingLesson(lesson);
         setIsFormOpen(true);
@@ -334,9 +465,11 @@ const App: React.FC = () => {
                 onNextMonth={() => setCurrentDate((d) => new Date(d.setMonth(d.getMonth() + 1)))}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onOpenExport={() => setIsExportFormOpen(true)}
+                onOpenExpenses={() => setIsExpensesOpen(true)}
                 user={user}
                 onSignOut={signOut}
             />
+
             <main className="max-w-5xl mx-auto pb-24">
                 <Summary
                     totalLessons={summaryData.totalLessons}
@@ -347,7 +480,10 @@ const App: React.FC = () => {
                     totalInvoicedNet={summaryData.totalInvoicedNet}
                     totalNotInvoicedIncome={summaryData.totalNotInvoicedIncome}
                     taxRate={summaryData.taxRate}
+                    totalExpenses={totalExpensesMonth}
+                    netProfit={netProfitMonth}
                 />
+
                 <LessonList
                     lessons={monthlyLessons}
                     settings={settings}
@@ -356,6 +492,7 @@ const App: React.FC = () => {
                     onEdit={handleStartEdit}
                 />
             </main>
+
             <div className="fixed bottom-6 right-6 z-20">
                 <button
                     onClick={handleOpenFormForAdd}
@@ -365,6 +502,7 @@ const App: React.FC = () => {
                     <PlusIcon className="w-8 h-8" />
                 </button>
             </div>
+
             <LessonForm
                 isOpen={isFormOpen}
                 onClose={() => setIsFormOpen(false)}
@@ -373,6 +511,7 @@ const App: React.FC = () => {
                 lessonToEdit={editingLesson}
                 settings={settings}
             />
+
             <SettingsForm
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
@@ -381,6 +520,21 @@ const App: React.FC = () => {
                 onSave={handleSaveSettings}
                 onRestoreLatestBackup={handleRestoreLatestSettingsBackup}
             />
+
+            <ExpensesModal
+                isOpen={isExpensesOpen}
+                onClose={() => setIsExpensesOpen(false)}
+                currentDate={currentDate}
+                categories={expenseCategories}
+                expenses={expenses}
+                onAddCategory={handleAddExpenseCategory}
+                onRenameCategory={handleRenameExpenseCategory}
+                onDeleteCategory={handleDeleteExpenseCategory}
+                onAddExpense={handleAddExpense}
+                onUpdateExpense={handleUpdateExpense}
+                onDeleteExpense={handleDeleteExpense}
+            />
+
             <ExportForm
                 isOpen={isExportFormOpen}
                 onClose={() => setIsExportFormOpen(false)}
