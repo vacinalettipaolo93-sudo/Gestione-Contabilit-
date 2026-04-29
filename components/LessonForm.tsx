@@ -10,7 +10,16 @@ interface LessonFormProps {
   settings: Settings;
 }
 
-const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, onUpdateLesson, lessonToEdit, settings }) => {
+const CUSTOM_LESSON_TYPE_ID = 'custom';
+
+const LessonForm: React.FC<LessonFormProps> = ({
+  isOpen,
+  onClose,
+  onAddLesson,
+  onUpdateLesson,
+  lessonToEdit,
+  settings,
+}) => {
   const [date, setDate] = useState('');
   const [sportId, setSportId] = useState<string>('');
   const [lessonTypeId, setLessonTypeId] = useState<string>('');
@@ -19,81 +28,128 @@ const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, o
   const [cost, setCost] = useState(0);
   const [invoiced, setInvoiced] = useState(false);
 
-  const isEditing = !!lessonToEdit;
+  // Custom (incasso al volo)
+  const [customLessonTypeName, setCustomLessonTypeName] = useState('');
+  const [customPrice, setCustomPrice] = useState<string>('');
 
-  const selectedSport = useMemo(() => settings.sports.find(s => s.id === sportId), [sportId, settings]);
+  const isEditing = !!lessonToEdit;
+  const isCustom = lessonTypeId === CUSTOM_LESSON_TYPE_ID;
+
+  const selectedSport = useMemo(() => settings.sports.find((s) => s.id === sportId), [sportId, settings]);
   const availableLessonTypes = useMemo(() => selectedSport?.lessonTypes || [], [selectedSport]);
   const availableLocations = useMemo(() => selectedSport?.locations || [], [selectedSport]);
-  
-  useEffect(() => {
-    if (isOpen) {
-        if (isEditing && lessonToEdit) {
-            setSportId(lessonToEdit.sportId);
-            setDate(lessonToEdit.date);
-            setInvoiced(lessonToEdit.invoiced || false);
-            setTimeout(() => {
-                setLessonTypeId(lessonToEdit.lessonTypeId);
-                setLocationId(lessonToEdit.locationId);
-            }, 0);
-        } else {
-            const firstSport = settings.sports[0];
-            setDate(new Date().toISOString().split('T')[0]);
-            setSportId(firstSport?.id || '');
-            setLessonTypeId(firstSport?.lessonTypes?.[0]?.id || '');
-            setLocationId(firstSport?.locations?.[0]?.id || '');
-            setInvoiced(false);
-        }
-    }
-  }, [lessonToEdit, isOpen, settings]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    if (isEditing && lessonToEdit) {
+      setSportId(lessonToEdit.sportId);
+      setDate(lessonToEdit.date);
+      setInvoiced(lessonToEdit.invoiced || false);
+
+      setCustomLessonTypeName(lessonToEdit.customLessonTypeName || '');
+      setCustomPrice(
+        typeof lessonToEdit.customPrice === 'number' ? String(lessonToEdit.customPrice) : ''
+      );
+
+      setTimeout(() => {
+        setLessonTypeId(lessonToEdit.lessonTypeId);
+        setLocationId(lessonToEdit.locationId);
+      }, 0);
+    } else {
+      const firstSport = settings.sports[0];
+      setDate(new Date().toISOString().split('T')[0]);
+      setSportId(firstSport?.id || '');
+      setLessonTypeId(firstSport?.lessonTypes?.[0]?.id || '');
+      setLocationId(firstSport?.locations?.[0]?.id || '');
+      setInvoiced(false);
+
+      setCustomLessonTypeName('');
+      setCustomPrice('');
+    }
+  }, [lessonToEdit, isOpen, settings, isEditing]);
+
+  useEffect(() => {
+    // Quando cambio sport, reset tipo/sede SOLO se non sto editando la stessa sport
     if (!isEditing || (isEditing && lessonToEdit?.sportId !== sportId)) {
-        setLessonTypeId(availableLessonTypes[0]?.id || '');
-        setLocationId(availableLocations[0]?.id || '');
+      setLessonTypeId(availableLessonTypes[0]?.id || '');
+      setLocationId(availableLocations[0]?.id || '');
+      setCustomLessonTypeName('');
+      setCustomPrice('');
     }
   }, [sportId, availableLessonTypes, availableLocations, isEditing, lessonToEdit]);
 
-
   useEffect(() => {
-    if(selectedSport && lessonTypeId) {
-        setPrice(selectedSport.prices[lessonTypeId] || 0);
-    } else {
-        setPrice(0);
-    }
-    
-    if (selectedSport && locationId && lessonTypeId && selectedSport.costs) {
-        const locationCosts = selectedSport.costs[locationId];
-        if (locationCosts) {
-            setCost(locationCosts[lessonTypeId] || 0);
-        } else {
-            setCost(0);
-        }
-    } else {
-        setCost(0);
+    // Se custom: prezzo = customPrice e costo = 0
+    if (isCustom) {
+      const p = Number(customPrice);
+      setPrice(Number.isFinite(p) ? p : 0);
+      setCost(0);
+      return;
     }
 
-  }, [sportId, lessonTypeId, locationId, selectedSport]);
+    // Standard: prezzo/costo da settings
+    if (selectedSport && lessonTypeId) {
+      setPrice(selectedSport.prices[lessonTypeId] || 0);
+    } else {
+      setPrice(0);
+    }
+
+    if (selectedSport && locationId && lessonTypeId && selectedSport.costs) {
+      const locationCosts = selectedSport.costs[locationId];
+      if (locationCosts) {
+        setCost(locationCosts[lessonTypeId] || 0);
+      } else {
+        setCost(0);
+      }
+    } else {
+      setCost(0);
+    }
+  }, [sportId, lessonTypeId, locationId, selectedSport, isCustom, customPrice]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const lessonData = {
-        date,
-        sportId,
-        lessonTypeId,
-        locationId,
-        price,
-        cost,
-        invoiced,
+
+    if (isCustom) {
+      if (!customLessonTypeName.trim()) {
+        alert('Inserisci un nome per la lezione personalizzata (es. Torneo).');
+        return;
+      }
+      const p = Number(customPrice);
+      if (!Number.isFinite(p)) {
+        alert('Inserisci un incasso valido.');
+        return;
+      }
+    }
+
+    const lessonData: Omit<Lesson, 'id'> = {
+      date,
+      sportId,
+      lessonTypeId,
+      locationId,
+      price,
+      cost,
+      invoiced,
+      ...(isCustom
+        ? {
+            customLessonTypeName: customLessonTypeName.trim(),
+            customPrice: Number(customPrice),
+          }
+        : {
+            customLessonTypeName: '',
+            customPrice: 0,
+          }),
     };
 
-    if (isEditing) {
+    if (isEditing && lessonToEdit) {
       onUpdateLesson({
         ...lessonToEdit,
-        ...lessonData
+        ...lessonData,
       });
     } else {
       onAddLesson(lessonData);
     }
+
     onClose();
   };
 
@@ -101,13 +157,19 @@ const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, o
 
   return (
     <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-zinc-900 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/10 transform transition-all" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="bg-zinc-900 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/10 transform transition-all"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-2xl font-bold mb-6 text-white border-b border-white/5 pb-4">
-            {isEditing ? 'Modifica Lezione' : 'Nuova Lezione'}
+          {isEditing ? 'Modifica Lezione' : 'Nuova Lezione'}
         </h2>
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="date" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Data</label>
+            <label htmlFor="date" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">
+              Data
+            </label>
             <input
               type="date"
               id="date"
@@ -120,35 +182,46 @@ const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, o
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-                <label htmlFor="sport" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Sport</label>
-                <select
+              <label htmlFor="sport" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">
+                Sport
+              </label>
+              <select
                 id="sport"
                 value={sportId}
                 onChange={(e) => setSportId(e.target.value)}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-zinc-100"
-                >
+              >
                 {settings.sports.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
-                </select>
+              </select>
             </div>
+
             <div>
-                <label htmlFor="location" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Sede</label>
-                <select
+              <label htmlFor="location" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">
+                Sede
+              </label>
+              <select
                 id="location"
                 value={locationId}
                 onChange={(e) => setLocationId(e.target.value)}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-zinc-100"
-                >
+              >
                 {availableLocations.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
                 ))}
-                </select>
+              </select>
             </div>
           </div>
 
           <div>
-            <label htmlFor="lessonType" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Tipo Lezione</label>
+            <label htmlFor="lessonType" className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">
+              Tipo Lezione
+            </label>
             <select
               id="lessonType"
               value={lessonTypeId}
@@ -156,37 +229,69 @@ const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, o
               className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-zinc-100"
             >
               {availableLessonTypes.map((lt) => (
-                <option key={lt.id} value={lt.id}>{lt.name}</option>
+                <option key={lt.id} value={lt.id}>
+                  {lt.name}
+                </option>
               ))}
+              <option value={CUSTOM_LESSON_TYPE_ID}>➕ Personalizzato (incasso al volo)</option>
             </select>
           </div>
-          
-          <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-              <label className="flex items-center cursor-pointer">
+
+          {isCustom && (
+            <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Nome</label>
                 <input
-                    type="checkbox"
-                    checked={invoiced}
-                    onChange={(e) => setInvoiced(e.target.checked)}
-                    className="w-5 h-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 bg-zinc-800"
+                  value={customLessonTypeName}
+                  onChange={(e) => setCustomLessonTypeName(e.target.value)}
+                  className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-zinc-100"
+                  placeholder="Es. Torneo, Incasso campo..."
                 />
-                <span className="ml-3 text-sm font-medium text-zinc-300">Lezione Fatturata</span>
-              </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1 ml-1">Incasso (€)</label>
+                <input
+                  type="number"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-zinc-100"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <p className="text-xs text-zinc-500">
+                In modalità personalizzata il <b>costo</b> è impostato a <b>0</b>.
+              </p>
+            </div>
+          )}
+
+          <div className="bg-black/20 p-4 rounded-xl border border-white/5">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={invoiced}
+                onChange={(e) => setInvoiced(e.target.checked)}
+                className="w-5 h-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 bg-zinc-800"
+              />
+              <span className="ml-3 text-sm font-medium text-zinc-300">Lezione Fatturata</span>
+            </label>
           </div>
 
           <div className="flex justify-between items-center py-2 px-1">
             <div className="text-center">
-                <span className="block text-xs text-zinc-500 uppercase font-bold">Prezzo</span>
-                <span className="block font-bold text-xl text-emerald-500">€ {price.toFixed(2)}</span>
+              <span className="block text-xs text-zinc-500 uppercase font-bold">Prezzo</span>
+              <span className="block font-bold text-xl text-emerald-500">€ {price.toFixed(2)}</span>
             </div>
             <div className="h-8 w-px bg-zinc-800"></div>
             <div className="text-center">
-                <span className="block text-xs text-zinc-500 uppercase font-bold">Costo</span>
-                <span className="block font-bold text-xl text-red-500">€ {cost.toFixed(2)}</span>
+              <span className="block text-xs text-zinc-500 uppercase font-bold">Costo</span>
+              <span className="block font-bold text-xl text-red-500">€ {cost.toFixed(2)}</span>
             </div>
             <div className="h-8 w-px bg-zinc-800"></div>
-             <div className="text-center">
-                <span className="block text-xs text-zinc-500 uppercase font-bold">Utile</span>
-                <span className="block font-bold text-xl text-indigo-500">€ {(price - cost).toFixed(2)}</span>
+            <div className="text-center">
+              <span className="block text-xs text-zinc-500 uppercase font-bold">Utile</span>
+              <span className="block font-bold text-xl text-indigo-500">€ {(price - cost).toFixed(2)}</span>
             </div>
           </div>
 
@@ -200,7 +305,7 @@ const LessonForm: React.FC<LessonFormProps> = ({ isOpen, onClose, onAddLesson, o
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-500/20 text-sm font-semibold transition-all transform hover:scale-[1.02]"
+              className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl hover:from-indigo-500 hover:to-cyan-400 shadow-lg shadow-indigo-500/20 text-sm font-semibold transition-all"
             >
               {isEditing ? 'Salva' : 'Aggiungi'}
             </button>
