@@ -69,7 +69,6 @@ const App: React.FC = () => {
 
     const settingsRef = doc(db, 'users', user.uid, 'settings', 'main');
     const lessonsCollectionRef = collection(db, 'users', user.uid, 'lessons');
-
     const expenseCategoriesRef = collection(db, 'users', user.uid, 'expense_categories');
     const expensesRef = collection(db, 'users', user.uid, 'expenses');
 
@@ -125,6 +124,10 @@ const App: React.FC = () => {
             price: data.price || 0,
             cost: data.cost || 0,
             invoiced: data.invoiced || false,
+
+            // custom (incasso al volo)
+            customLessonTypeName: data.customLessonTypeName || '',
+            customPrice: typeof data.customPrice === 'number' ? data.customPrice : Number(data.customPrice || 0),
           } as Lesson;
         });
         setLessons(userLessons);
@@ -231,11 +234,15 @@ const App: React.FC = () => {
     const lessonsByLessonType = monthlyLessons.reduce((acc, lesson) => {
       const sport = settings.sports.find((s) => s.id === lesson.sportId);
       if (!sport) return acc;
-      const lessonType = sport.lessonTypes.find((lt) => lt.id === lesson.lessonTypeId);
-      if (lessonType) {
-        const key = `${sport.name} - ${lessonType.name}`;
-        acc[key] = (acc[key] || 0) + 1;
-      }
+
+      // Se custom, metto un label più chiaro
+      const lessonTypeName =
+        lesson.lessonTypeId === 'custom'
+          ? (lesson.customLessonTypeName || 'Personalizzato')
+          : (sport.lessonTypes.find((lt) => lt.id === lesson.lessonTypeId)?.name || 'Tipo sconosciuto');
+
+      const key = `${sport.name} - ${lessonTypeName}`;
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -269,10 +276,11 @@ const App: React.FC = () => {
     };
   }, [monthlyLessons, settings]);
 
-  // ✅ NETTO RICHIESTO: Fatturato Netto - Spese
+  // ✅ NETTO RICHIESTO:
+  // (Fatturato Netto + Utile non fatturato) - Spese
   const netProfitMonth = useMemo(() => {
-    return summaryData.totalInvoicedNet - totalExpensesMonth;
-  }, [summaryData.totalInvoicedNet, totalExpensesMonth]);
+    return summaryData.totalInvoicedNet + summaryData.totalNotInvoicedIncome - totalExpensesMonth;
+  }, [summaryData.totalInvoicedNet, summaryData.totalNotInvoicedIncome, totalExpensesMonth]);
 
   const handleAddLesson = (newLessonData: Omit<Lesson, 'id'>) => {
     if (!user) return;
@@ -284,7 +292,7 @@ const App: React.FC = () => {
     if (!user) return;
     const { id, ...data } = updatedLessonData;
     const lessonDocRef = doc(db, 'users', user.uid, 'lessons', id);
-    updateDoc(lessonDocRef, data);
+    updateDoc(lessonDocRef, data as any);
   };
 
   const handleDeleteLesson = (id: string) => {
