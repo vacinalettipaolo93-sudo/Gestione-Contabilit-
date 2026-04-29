@@ -26,29 +26,19 @@ export interface Lesson {
   id: string;
   date: string; // YYYY-MM-DD
   sportId: string;
+
+  /**
+   * Se è una lezione standard: lessonTypeId è l'id del tipo in Settings.
+   * Se è personalizzata al volo: lessonTypeId === 'custom'
+   */
   lessonTypeId: string;
+
   locationId: string;
   price: number;
   cost: number;
   invoiced: boolean;
-}
 
-/** Spese */
-
-export interface ExpenseCategory {
-  id: string;
-  name: string;
-  createdAt?: any;
-  updatedAt?: any;
-}
-
-export interface Expense {
-  id: string;
-  date: string; // YYYY-MM-DD
-  categoryId: string;
-  name: string;
-  amount: number;
-  notes?: string;
-  createdAt?: any;
-  updatedAt?: any;
+  /** Campi per le lezioni “personalizzate (incasso al volo)” */
+  customLessonTypeName?: string; // es. "Torneo"
+  customPrice?: number; // incasso manuale
 }
