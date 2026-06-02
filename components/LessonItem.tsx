@@ -10,6 +10,8 @@ interface LessonItemProps {
   onEdit: (lesson: Lesson) => void;
 }
 
+const CUSTOM_LESSON_LABEL = 'Personalizzato';
+
 const LessonItem: React.FC<LessonItemProps> = ({ lesson, settings, onDelete, onToggleInvoiced, onEdit }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -20,7 +22,10 @@ const LessonItem: React.FC<LessonItemProps> = ({ lesson, settings, onDelete, onT
   const location = sport?.locations.find(l => l.id === lesson.locationId);
 
   const sportName = sport?.name || 'N/D';
-  const lessonTypeName = lessonType?.name || 'N/D';
+  const lessonTypeName =
+    lesson.lessonTypeId === 'custom'
+      ? (lesson.customLessonTypeName?.trim() || CUSTOM_LESSON_LABEL)
+      : (lessonType?.name || 'N/D');
   const locationName = location?.name || 'N/D';
 
   const sportColorClasses = sport?.id === 'tennis' 
