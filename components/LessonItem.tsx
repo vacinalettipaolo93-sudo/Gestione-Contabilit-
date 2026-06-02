@@ -20,7 +20,10 @@ const LessonItem: React.FC<LessonItemProps> = ({ lesson, settings, onDelete, onT
   const location = sport?.locations.find(l => l.id === lesson.locationId);
 
   const sportName = sport?.name || 'N/D';
-  const lessonTypeName = lessonType?.name || 'N/D';
+  const lessonTypeName =
+    lesson.lessonTypeId === 'custom'
+      ? lesson.customLessonTypeName?.trim() || 'Personalizzato'
+      : lessonType?.name || 'N/D';
   const locationName = location?.name || 'N/D';
 
   const sportColorClasses = sport?.id === 'tennis' 
