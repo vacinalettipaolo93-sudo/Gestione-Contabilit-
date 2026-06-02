@@ -32,9 +32,16 @@ export const DEFAULT_SETTINGS: Settings = {
         { id: SEDE_B_ID, name: 'Sede Secondaria B' },
       ],
       prices: {
-        [TENNIS_SINGLE_ID]: 30,
-        [TENNIS_DOUBLE_ID]: 40,
-        [TENNIS_GROUP_ID]: 60,
+        [SEDE_A_ID]: {
+          [TENNIS_SINGLE_ID]: 30,
+          [TENNIS_DOUBLE_ID]: 40,
+          [TENNIS_GROUP_ID]: 60,
+        },
+        [SEDE_B_ID]: {
+          [TENNIS_SINGLE_ID]: 30,
+          [TENNIS_DOUBLE_ID]: 40,
+          [TENNIS_GROUP_ID]: 60,
+        },
       },
       costs: {
         [SEDE_A_ID]: {
@@ -60,8 +67,10 @@ export const DEFAULT_SETTINGS: Settings = {
          { id: PADEL_CENTER_ID, name: 'Padel Center' },
       ],
       prices: {
-        [PADEL_DOUBLE_ID]: 35,
-        [PADEL_GROUP_ID]: 55,
+        [PADEL_CENTER_ID]: {
+          [PADEL_DOUBLE_ID]: 35,
+          [PADEL_GROUP_ID]: 55,
+        },
       },
       costs: {
         [PADEL_CENTER_ID]: {

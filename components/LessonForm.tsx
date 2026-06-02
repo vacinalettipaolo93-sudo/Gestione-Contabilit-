@@ -89,8 +89,15 @@ const LessonForm: React.FC<LessonFormProps> = ({
     }
 
     // Standard: prezzo/costo da settings
-    if (selectedSport && lessonTypeId) {
-      setPrice(selectedSport.prices[lessonTypeId] || 0);
+    if (selectedSport && locationId && lessonTypeId) {
+      const locationPrices = selectedSport.prices?.[locationId];
+      const locationPrice =
+        locationPrices && typeof locationPrices[lessonTypeId] === 'number' ? locationPrices[lessonTypeId] : undefined;
+      const legacyPrice =
+        typeof (selectedSport.prices as any)?.[lessonTypeId] === 'number'
+          ? (selectedSport.prices as any)[lessonTypeId]
+          : undefined;
+      setPrice(locationPrice ?? legacyPrice ?? 0);
     } else {
       setPrice(0);
     }

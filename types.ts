@@ -13,7 +13,7 @@ export interface SportSetting {
   name: string;
   lessonTypes: LessonTypeConfig[];
   locations: LocationConfig[];
-  prices: Record<string, number>; // { [lessonTypeId]: price }
+  prices: Record<string, Record<string, number>>; // { [locationId]: { [lessonTypeId]: price } }
   costs: Record<string, Record<string, number>>; // { [locationId]: { [lessonTypeId]: cost } }
 }
 

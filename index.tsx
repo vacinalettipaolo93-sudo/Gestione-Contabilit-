@@ -90,7 +90,27 @@ const App: React.FC = () => {
                 name: sport.name || 'Senza nome',
                 lessonTypes: Array.isArray(sport.lessonTypes) ? sport.lessonTypes : [],
                 locations: Array.isArray(sport.locations) ? sport.locations : [],
-                prices: typeof sport.prices === 'object' && sport.prices !== null ? (sport.prices as any) : {},
+                prices: (() => {
+                  const lessonTypes = Array.isArray(sport.lessonTypes) ? sport.lessonTypes : [];
+                  const locations = Array.isArray(sport.locations) ? sport.locations : [];
+                  const rawPrices = typeof sport.prices === 'object' && sport.prices !== null ? (sport.prices as any) : {};
+
+                  return locations.reduce((pricesByLocation, location) => {
+                    pricesByLocation[location.id] = lessonTypes.reduce((acc, lessonType) => {
+                      const nestedPrice = rawPrices?.[location.id]?.[lessonType.id];
+                      const legacyPrice = rawPrices?.[lessonType.id];
+                      const resolvedPrice =
+                        typeof nestedPrice === 'number'
+                          ? nestedPrice
+                          : typeof legacyPrice === 'number'
+                            ? legacyPrice
+                            : 0;
+                      acc[lessonType.id] = resolvedPrice;
+                      return acc;
+                    }, {} as Record<string, number>);
+                    return pricesByLocation;
+                  }, {} as Record<string, Record<string, number>>);
+                })(),
                 costs: typeof sport.costs === 'object' && sport.costs !== null ? (sport.costs as any) : {},
               })),
           };
