@@ -270,21 +270,21 @@ const SettingsForm: React.FC<{
                                 {sport.locations.length > 0 && sport.lessonTypes.length > 0 && (
                                     <div className="mt-8">
                                         <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Prezzi Sede (per tipo lezione)</h4>
-                                        <div className="overflow-hidden rounded-xl border border-white/10 mb-4">
-                                            <table className="w-full text-sm text-left bg-white/5">
+                                        <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-white/10 mb-4">
+                                            <table className="w-max min-w-full text-sm text-left bg-white/5">
                                                 <thead>
                                                     <tr className="border-b border-white/10 bg-white/5">
-                                                        <th className="p-3 font-semibold text-zinc-300">Sede</th>
-                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center">{lt.name}</th>)}
+                                                        <th className="p-3 font-semibold text-zinc-300 whitespace-nowrap min-w-[180px]">Sede</th>
+                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center whitespace-nowrap min-w-[140px]">{lt.name}</th>)}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {sport.locations.map(loc => (
                                                         <tr key={loc.id} className="border-b border-white/5 last:border-0">
-                                                            <td className="p-3 font-medium text-zinc-200">{loc.name}</td>
+                                                            <td className="p-3 font-medium text-zinc-200 whitespace-nowrap min-w-[180px]">{loc.name}</td>
                                                             {sport.lessonTypes.map(lt => (
                                                                 <td key={lt.id} className="p-2">
-                                                                    <div className="relative max-w-[100px] mx-auto">
+                                                                    <div className="relative w-[120px] mx-auto">
                                                                         <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-zinc-400 text-xs">€</span>
                                                                         <input
                                                                             type="number"
@@ -301,21 +301,21 @@ const SettingsForm: React.FC<{
                                             </table>
                                         </div>
                                         <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Costi Sede (per tipo lezione)</h4>
-                                        <div className="overflow-hidden rounded-xl border border-white/10">
-                                            <table className="w-full text-sm text-left bg-white/5">
+                                        <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-white/10">
+                                            <table className="w-max min-w-full text-sm text-left bg-white/5">
                                                 <thead>
                                                     <tr className="border-b border-white/10 bg-white/5">
-                                                        <th className="p-3 font-semibold text-zinc-300">Sede</th>
-                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center">{lt.name}</th>)}
+                                                        <th className="p-3 font-semibold text-zinc-300 whitespace-nowrap min-w-[180px]">Sede</th>
+                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center whitespace-nowrap min-w-[140px]">{lt.name}</th>)}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {sport.locations.map(loc => (
                                                         <tr key={loc.id} className="border-b border-white/5 last:border-0">
-                                                            <td className="p-3 font-medium text-zinc-200">{loc.name}</td>
+                                                            <td className="p-3 font-medium text-zinc-200 whitespace-nowrap min-w-[180px]">{loc.name}</td>
                                                             {sport.lessonTypes.map(lt => (
                                                                 <td key={lt.id} className="p-2">
-                                                                    <div className="relative max-w-[100px] mx-auto">
+                                                                    <div className="relative w-[120px] mx-auto">
                                                                         <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-zinc-400 text-xs">€</span>
                                                                         <input
                                                                             type="number"
