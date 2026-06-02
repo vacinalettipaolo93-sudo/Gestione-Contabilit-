@@ -68,7 +68,11 @@ const SettingsForm: React.FC<{
     const removeLessonType = (sportIndex: number, ltIndex: number) => {
         updateSettings(draft => {
             const lessonTypeId = draft.sports[sportIndex].lessonTypes[ltIndex].id;
-            delete draft.sports[sportIndex].prices[lessonTypeId];
+            Object.keys(draft.sports[sportIndex].prices).forEach(locId => {
+                if (draft.sports[sportIndex].prices[locId]) {
+                    delete draft.sports[sportIndex].prices[locId][lessonTypeId];
+                }
+            });
             Object.keys(draft.sports[sportIndex].costs).forEach(locId => {
                 if (draft.sports[sportIndex].costs[locId]) {
                     delete draft.sports[sportIndex].costs[locId][lessonTypeId];
@@ -96,6 +100,7 @@ const SettingsForm: React.FC<{
     const removeLocation = (sportIndex: number, locIndex: number) => {
         updateSettings(draft => {
             const locationId = draft.sports[sportIndex].locations[locIndex].id;
+            delete draft.sports[sportIndex].prices[locationId];
             delete draft.sports[sportIndex].costs[locationId];
             draft.sports[sportIndex].locations.splice(locIndex, 1);
         });
@@ -107,9 +112,12 @@ const SettingsForm: React.FC<{
         });
     };
 
-    const updatePrice = (sportIndex: number, lessonTypeId: string, price: number) => {
+    const updatePrice = (sportIndex: number, locationId: string, lessonTypeId: string, price: number) => {
         updateSettings(draft => {
-            draft.sports[sportIndex].prices[lessonTypeId] = price;
+            if (!draft.sports[sportIndex].prices[locationId]) {
+                draft.sports[sportIndex].prices[locationId] = {};
+            }
+            draft.sports[sportIndex].prices[locationId][lessonTypeId] = price;
         });
     };
 
@@ -187,10 +195,10 @@ const SettingsForm: React.FC<{
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {/* Lesson Types & Prices */}
+                                    {/* Lesson Types */}
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider">Tipi di Lezione & Prezzi</h4>
+                                            <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider">Tipi di Lezione</h4>
                                         </div>
                                         <div className="space-y-3">
                                             {sport.lessonTypes.map((lt, ltIndex) => {
@@ -203,15 +211,6 @@ const SettingsForm: React.FC<{
                                                             onChange={(e) => updateLessonTypeName(sportIndex, ltIndex, e.target.value)}
                                                             className="flex-grow px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-200 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         />
-                                                        <div className="relative">
-                                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400 text-sm">€</span>
-                                                            <input
-                                                                type="number"
-                                                                value={sport.prices[lt.id] || ''}
-                                                                onChange={(e) => updatePrice(sportIndex, lt.id, parseFloat(e.target.value) || 0)}
-                                                                className="w-24 pl-7 pr-2 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-200 focus:ring-2 focus:ring-emerald-500/50 outline-none"
-                                                            />
-                                                        </div>
                                                         <button
                                                             onClick={() => removeLessonType(sportIndex, ltIndex)}
                                                             disabled={ltUsed}
@@ -270,6 +269,37 @@ const SettingsForm: React.FC<{
                                 {/* Costs Table */}
                                 {sport.locations.length > 0 && sport.lessonTypes.length > 0 && (
                                     <div className="mt-8">
+                                        <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Prezzi Sede (per tipo lezione)</h4>
+                                        <div className="overflow-hidden rounded-xl border border-white/10 mb-4">
+                                            <table className="w-full text-sm text-left bg-white/5">
+                                                <thead>
+                                                    <tr className="border-b border-white/10 bg-white/5">
+                                                        <th className="p-3 font-semibold text-zinc-300">Sede</th>
+                                                        {sport.lessonTypes.map(lt => <th key={lt.id} className="p-3 font-semibold text-zinc-300 text-center">{lt.name}</th>)}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {sport.locations.map(loc => (
+                                                        <tr key={loc.id} className="border-b border-white/5 last:border-0">
+                                                            <td className="p-3 font-medium text-zinc-200">{loc.name}</td>
+                                                            {sport.lessonTypes.map(lt => (
+                                                                <td key={lt.id} className="p-2">
+                                                                    <div className="relative max-w-[100px] mx-auto">
+                                                                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-zinc-400 text-xs">€</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(sport.prices[loc.id] && sport.prices[loc.id][lt.id]) || ''}
+                                                                            onChange={(e) => updatePrice(sportIndex, loc.id, lt.id, parseFloat(e.target.value) || 0)}
+                                                                            className="w-full pl-5 pr-2 py-1.5 bg-black/20 border border-white/10 rounded-md text-sm text-center focus:ring-1 focus:ring-emerald-500/50 outline-none text-white"
+                                                                        />
+                                                                    </div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                         <h4 className="font-semibold text-zinc-400 uppercase text-xs tracking-wider mb-3">Costi Sede (per tipo lezione)</h4>
                                         <div className="overflow-hidden rounded-xl border border-white/10">
                                             <table className="w-full text-sm text-left bg-white/5">
