@@ -30,9 +30,11 @@ const Header: React.FC<HeaderProps> = ({
     <header className="bg-zinc-950/70 backdrop-blur-md p-4 sticky top-0 z-30 border-b border-white/5">
       <div className="max-w-5xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
-            GC
-          </div>
+          <img
+            src="/icons/icon-192.png"
+            alt="Logo Gestione Contabilità"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-xl object-cover shadow-lg shadow-indigo-500/20"
+          />
           <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             Contabilità
           </h1>
