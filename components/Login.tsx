@@ -44,7 +44,14 @@ const Login: React.FC = () => {
 
             <div className="w-full max-w-md relative z-10">
                 <div className="bg-zinc-900/60 backdrop-blur-xl shadow-2xl rounded-2xl p-8 space-y-8 border border-white/10">
-                    <div className="text-center space-y-2">
+                    <div className="text-center space-y-3">
+                        <div className="flex justify-center">
+                            <img
+                                src="/icons/icon-192.png"
+                                alt="Logo Gestione Contabilità"
+                                className="w-20 h-20 rounded-2xl shadow-xl shadow-indigo-500/30 object-cover"
+                            />
+                        </div>
                         <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-500 to-cyan-400 bg-clip-text text-transparent pb-1">Gestione Contabilità</h1>
                         <p className="text-zinc-400 text-sm font-medium uppercase tracking-wider">Dashboard Access</p>
                     </div>
