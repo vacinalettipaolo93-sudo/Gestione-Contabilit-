@@ -28,6 +28,7 @@ import Login from './components/Login';
 import { PlusIcon } from './components/icons';
 import { DEFAULT_SETTINGS } from './constants';
 import { auth, db, signOut } from './firebase';
+import { getLessonTypeDisplayName } from './lessonUtils';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<any | null>(null);
@@ -255,12 +256,7 @@ const App: React.FC = () => {
       const sport = settings.sports.find((s) => s.id === lesson.sportId);
       if (!sport) return acc;
 
-      // Se custom, metto un label più chiaro
-      const lessonTypeName =
-        lesson.lessonTypeId === 'custom'
-          ? (lesson.customLessonTypeName || 'Personalizzato')
-          : (sport.lessonTypes.find((lt) => lt.id === lesson.lessonTypeId)?.name || 'Tipo sconosciuto');
-
+      const lessonTypeName = getLessonTypeDisplayName(lesson, sport, 'Personalizzato');
       const key = `${sport.name} - ${lessonTypeName}`;
       acc[key] = (acc[key] || 0) + 1;
       return acc;

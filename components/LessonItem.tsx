@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lesson, Settings } from '../types';
+import { getLessonTypeDisplayName } from '../lessonUtils';
 import { TrashIcon, PencilIcon } from './icons';
 
 interface LessonItemProps {
@@ -10,22 +11,16 @@ interface LessonItemProps {
   onEdit: (lesson: Lesson) => void;
 }
 
-const CUSTOM_LESSON_LABEL = 'Personalizzato';
-
 const LessonItem: React.FC<LessonItemProps> = ({ lesson, settings, onDelete, onToggleInvoiced, onEdit }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const date = new Date(lesson.date + 'T00:00:00');
 
   const sport = settings.sports.find(s => s.id === lesson.sportId);
-  const lessonType = sport?.lessonTypes.find(lt => lt.id === lesson.lessonTypeId);
   const location = sport?.locations.find(l => l.id === lesson.locationId);
 
   const sportName = sport?.name || 'N/D';
-  const lessonTypeName =
-    lesson.lessonTypeId === 'custom'
-      ? (lesson.customLessonTypeName?.trim() || CUSTOM_LESSON_LABEL)
-      : (lessonType?.name || 'N/D');
+  const lessonTypeName = getLessonTypeDisplayName(lesson, sport, 'Personalizzato');
   const locationName = location?.name || 'N/D';
 
   const sportColorClasses = sport?.id === 'tennis' 
