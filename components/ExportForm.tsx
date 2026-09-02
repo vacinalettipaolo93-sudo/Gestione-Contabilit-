@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Lesson, Settings } from '../types';
+import { getLessonTypeDisplayName } from '../lessonUtils';
 import { DocumentArrowDownIcon, SpinnerIcon } from './icons';
 
 interface ExportFormProps {
@@ -95,14 +96,13 @@ const ExportForm: React.FC<ExportFormProps> = ({ isOpen, onClose, lessons, setti
 
                 const tableData = filteredLessons.map(lesson => {
                     const sport = settings.sports.find(s => s.id === lesson.sportId);
-                    const lessonType = sport?.lessonTypes.find(lt => lt.id === lesson.lessonTypeId);
                     const location = sport?.locations.find(l => l.id === lesson.locationId);
                     const profit = lesson.price - lesson.cost;
                     
                     return [
                         new Date(lesson.date + 'T00:00:00').toLocaleDateString('it-IT'),
                         sport?.name || 'N/D',
-                        lessonType?.name || 'N/D',
+                        getLessonTypeDisplayName(lesson, sport),
                         location?.name || 'N/D',
                         lesson.invoiced ? 'Fatturata' : 'Non Fatt.',
                         `€ ${profit.toFixed(2)}`
@@ -200,9 +200,8 @@ const ExportForm: React.FC<ExportFormProps> = ({ isOpen, onClose, lessons, setti
 
                     const lessonsByLessonType = filteredLessons.reduce((acc, lesson) => {
                         const sport = settings.sports.find(s => s.id === lesson.sportId);
-                        const lessonType = sport?.lessonTypes.find(lt => lt.id === lesson.lessonTypeId);
-                        if (sport && lessonType) {
-                            const key = `${lessonType.name} (${sport.name})`;
+                        if (sport) {
+                            const key = `${getLessonTypeDisplayName(lesson, sport)} (${sport.name})`;
                             acc[key] = (acc[key] || 0) + 1;
                         }
                         return acc;
@@ -229,9 +228,8 @@ const ExportForm: React.FC<ExportFormProps> = ({ isOpen, onClose, lessons, setti
 
                     const profitByLessonType = filteredLessons.reduce((acc, lesson) => {
                         const sport = settings.sports.find(s => s.id === lesson.sportId);
-                        const lessonType = sport?.lessonTypes.find(lt => lt.id === lesson.lessonTypeId);
-                        if (sport && lessonType) {
-                            const key = `${lessonType.name} (${sport.name})`;
+                        if (sport) {
+                            const key = `${getLessonTypeDisplayName(lesson, sport)} (${sport.name})`;
                             const profit = lesson.price - lesson.cost;
                             acc[key] = (acc[key] || 0) + profit;
                         }
